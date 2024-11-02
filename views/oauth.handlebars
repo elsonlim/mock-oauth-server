@@ -1,0 +1,25 @@
+<div>
+  <h1>Mock OAuth login</h1>
+  <form
+    action="/{{directoryID}}/oauth2/v2.0/login?{{queryParameters}}"
+    method="post"
+  >
+    <div>
+      <label for="email">Email:</label>
+      <input type="email" id="email" name="email" required />
+    </div>
+    <div>
+      <label for="family_name">Family   Name:</label>
+      <input type="text" id="family_name" name="family_name" required />
+    </div>
+    <div>
+      <label for="given_name">Given Name:</label>
+      <input type="text" id="given_name" name="given_name" required />
+    </div>
+    <div>
+      <label for="tp_acct_typ">Account Type:</label>
+      <input type="text" id="tp_acct_typ" name="tp_acct_typ" required />
+    </div>
+    <button type="submit">Submit</button>
+  </form>
+</div>
