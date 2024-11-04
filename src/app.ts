@@ -21,7 +21,24 @@ interface UserData {
   code_verifier: string;
   client_id: string;
 }
+
+interface dataStoreUserData {
+  email: string;
+  family_name: string;
+  given_name: string;
+  tp_acct_typ: string;
+}
+
+interface dataObjInterface {
+  [key: string]: dataStoreUserData;
+}
+
 const codeToData = new Map<string, UserData>();
+const dataStore = new Map<string, dataObjInterface>();
+
+function convertToArray(obj: dataObjInterface): dataStoreUserData[] {
+  return Object.values(obj);
+}
 
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -31,6 +48,7 @@ app.get("/", function (req, res) {
 
 app.get("/:directoryID/oauth2/v2.0/authorize", function (req, res) {
   const directoryID = req.params.directoryID;
+  const client_id = req.query.client_id as string;
 
   const searchParams = new URLSearchParams(req.query as Record<string, string>);
   const queryParams = new URLSearchParams(
@@ -42,10 +60,21 @@ app.get("/:directoryID/oauth2/v2.0/authorize", function (req, res) {
     )
   ).toString();
 
-  res.render("oauth", { directoryID, queryParameters: queryParams });
+  const dataObj = dataStore.get(`${directoryID}-${client_id}`) || {}; // get dataobject from datastore
+  console.log(dataObj);
+  const userDataArray = convertToArray(dataObj); // convert dataobject to an array
+  console.log(userDataArray);
+  // pass to handlebar
+
+  res.render("oauth", {
+    directoryID,
+    queryParameters: queryParams,
+    userDataArray,
+  });
 });
 
 app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
+  const directoryID = req.params.directoryID;
   const email = req.body.email;
   const family_name = req.body.family_name;
   const given_name = req.body.given_name;
@@ -65,12 +94,24 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
     !family_name ||
     !given_name ||
     !tp_acct_typ ||
-    !code_verifier ||
+    // !code_verifier || to change to code_challenge and method
     !client_id
   ) {
     console.error("missing parameters:", req.body, req.query);
     res.status(400).send("Invalid redirect_uri");
   }
+
+  const idData = {
+    email,
+    family_name,
+    given_name,
+    tp_acct_typ,
+  };
+
+  const dataObj =
+    dataStore.get(`${directoryID}-${client_id}`) || ({} as dataObjInterface);
+  dataObj[email] = idData;
+  dataStore.set(`${directoryID}-${client_id}`, dataObj);
 
   const code = uuidv4();
   codeToData.set(code, {
@@ -90,6 +131,7 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
 });
 
 app.post("/:directoryID/oauth2/v2.0/token", (req, res) => {
+  const directoryID = req.params.directoryID;
   const timenow = Math.floor(Date.now() / 1000);
   const fifteenMinutesInMillis = 15 * 60 * 1000;
   const exipreTime = timenow + fifteenMinutesInMillis;
