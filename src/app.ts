@@ -4,6 +4,7 @@ import bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import UserCache from "./UserCache";
 
 dotenv.config();
 
@@ -22,23 +23,8 @@ interface UserData {
   client_id: string;
 }
 
-interface dataStoreUserData {
-  email: string;
-  family_name: string;
-  given_name: string;
-  tp_acct_typ: string;
-}
-
-interface dataObjInterface {
-  [key: string]: dataStoreUserData;
-}
-
-const codeToData = new Map<string, UserData>();
-const dataStore = new Map<string, dataObjInterface>();
-
-function convertToArray(obj: dataObjInterface): dataStoreUserData[] {
-  return Object.values(obj);
-}
+const pkceChallenges = new Map<string, UserData>();
+const userCache = new UserCache();
 
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -60,11 +46,7 @@ app.get("/:directoryID/oauth2/v2.0/authorize", function (req, res) {
     )
   ).toString();
 
-  const dataObj = dataStore.get(`${directoryID}-${client_id}`) || {}; // get dataobject from datastore
-  console.log(dataObj);
-  const userDataArray = convertToArray(dataObj); // convert dataobject to an array
-  console.log(userDataArray);
-  // pass to handlebar
+  const userDataArray = userCache.getUserDataArray(directoryID, client_id);
 
   res.render("oauth", {
     directoryID,
@@ -108,13 +90,12 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
     tp_acct_typ,
   };
 
-  const dataObj =
-    dataStore.get(`${directoryID}-${client_id}`) || ({} as dataObjInterface);
+  const dataObj = userCache.get(directoryID, client_id);
   dataObj[email] = idData;
-  dataStore.set(`${directoryID}-${client_id}`, dataObj);
+  userCache.set(directoryID, client_id, dataObj);
 
   const code = uuidv4();
-  codeToData.set(code, {
+  pkceChallenges.set(code, {
     email,
     family_name,
     given_name,
@@ -146,9 +127,15 @@ app.post("/:directoryID/oauth2/v2.0/token", (req, res) => {
     tp_acct_typ,
     code_verifier,
     client_id,
-  } = codeToData.get(code) as UserData;
+  } = pkceChallenges.get(code) as UserData;
 
   const name = `${given_name} ${family_name}`;
+
+  // extract the challenge,
+  // extract the verifier
+  // extract the algorithm
+  // match challenge and verifier
+  // throw error if doesn't match or proceed if match
 
   const access_token = jwt.sign(
     {
@@ -159,7 +146,7 @@ app.post("/:directoryID/oauth2/v2.0/token", (req, res) => {
       family_name,
       given_name,
       name,
-      scp: "email openid profile",
+      scp: "email openid profile", // probably sould get from somewhere
     },
     process.env.jwtSecret as string
   );
