@@ -1,3 +1,4 @@
+<script src="/oauth.js"></script>
 <div>
   <h1>Mock OAuth login</h1>
   <form
@@ -24,29 +25,11 @@
     <button type="submit">Submit</button>
   </form>
 
-  <div>
-    <h3>
-      {{#if userDataArray.length}}
-        Quick Submit (History)
-      {{/if}}
-    </h3>
-
-    {{#each userDataArray}}
-      <div
-        style="border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; cursor: pointer;"
-        onmouseover="this.style.borderWidth = '3px';"
-        onmouseout="this.style.borderWidth = '1px';"
-        onclick="document.getElementById('email').value = '{{this.email}}'; 
-                 document.getElementById('family_name').value = '{{this.family_name}}';
-                 document.getElementById('given_name').value = '{{this.given_name}}';
-                 document.getElementById('tp_acct_typ').value = '{{this.tp_acct_typ}}';
-                 document.getElementById('loginForm').submit();"
-      >
-        <div>given_name: {{this.given_name}}</div>
-        <div>family_name: {{this.family_name}}</div>
-        <div>email: {{this.email}}</div>
-        <div>tp_acct_typ: {{this.tp_acct_typ}}</div>
-      </div>
-    {{/each}}
-  </div>
+  <div id="quickSubmitContainer"></div>
 </div>
+<script>
+  const directoryID = "{{directoryID}}"; const client_id = "{{client_id}}";
+  renderQuickSubmit(directoryID,client_id)
+  document.getElementById('loginForm').addEventListener('submit',
+  oauthUtils.handleFormSubmit);
+</script>

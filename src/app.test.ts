@@ -53,28 +53,6 @@ describe("POST /:directoryID/oauth2/v2.0/login", () => {
     expect(res.header.location).toBe(redirectURI);
   });
 
-  it("should, show history after a submit", async () => {
-    await request(app)
-      .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_challenge=${code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
-      )
-      .send({
-        email: "test@example.com",
-        family_name: "Doe",
-        given_name: "John",
-        tp_acct_typ: "VENDOR",
-      });
-
-    const res = await request(app).get(
-      `/${directoryID}/oauth2/v2.0/authorize?redirect_uri=${redirectURI}&state=${state}&client_id=${clientId}`
-    );
-
-    expect(res.text).toContain("<div>email: test@example.com</div>");
-    expect(res.text).toContain("<div>family_name: Doe</div>");
-    expect(res.text).toContain("<div>given_name: John</div>");
-    expect(res.text).toContain("<div>tp_acct_typ: VENDOR</div>");
-  });
-
   it("should redirect to the redirect_uri with state if exist", async () => {
     const res = await request(app)
       .post(

@@ -3,10 +3,10 @@ import { engine } from "express-handlebars";
 import bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
 import dotenv from "dotenv";
-import UserCache from "./UserCache";
 import PkceChallenges, { PkceChallengesInterface } from "./PkceChallenges";
 import { createAccessToken, createIdToken } from "./jwtHelper";
 import HttpError from "./HttpError";
+import path from "path";
 
 dotenv.config();
 
@@ -17,9 +17,9 @@ app.set("view engine", "handlebars");
 app.use(express.json());
 
 const pkceChallenges = new PkceChallenges();
-const userCache = new UserCache();
 
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/", function (req, res) {
   res.render("home");
@@ -38,12 +38,10 @@ app.get("/:directoryID/oauth2/v2.0/authorize", function (req, res) {
     )
   ).toString();
 
-  const userDataArray = userCache.getUserDataArray(directoryID, client_id);
-
   res.render("oauth", {
     directoryID,
+    client_id,
     queryParameters: queryParams,
-    userDataArray,
   });
 });
 
@@ -81,10 +79,6 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
     given_name,
     tp_acct_typ,
   };
-
-  const dataObj = userCache.get(directory_id, client_id);
-  dataObj[email] = idData;
-  userCache.set(directory_id, client_id, dataObj);
 
   const code = uuidv4();
   pkceChallenges.set(code, {
