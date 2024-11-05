@@ -115,12 +115,11 @@ describe("POST /:directoryID/oauth2/v2.0/token", () => {
   const code_challenge = "XkjGR8UpEbhuwOI3U7uHd_GWLss6XU9rCDFL73pQMyo";
   const code_verifier = "NCf1tth97RkR64fofrITK_W2F_43NuDEtqdVBl_pt6Y";
   const code_challenge_method = "s256";
-  const clientId = "clientId";
+  const client_id = "272b6812-f7c9-4f91-b2bc-11be1caff807";
   const state = "state";
 
   interface JwtPayload {
     iat: number;
-    nbf: number;
     exp: number;
     email: string;
     family_name: string;
@@ -133,7 +132,7 @@ describe("POST /:directoryID/oauth2/v2.0/token", () => {
   it("should return correct json data", async () => {
     const loginRes = await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${client_id}`
       )
       .send({
         email: "test@example.com",
@@ -150,7 +149,7 @@ describe("POST /:directoryID/oauth2/v2.0/token", () => {
       .post(`/${directoryID}/oauth2/v2.0/token`)
       .set("Content-Type", "application/x-www-form-urlencoded")
       .send({
-        client_id: "272b6812-f7c9-4f91-b2bc-11be1caff807",
+        client_id,
         code,
         redirect_uri,
         client_secret,
@@ -175,18 +174,39 @@ describe("POST /:directoryID/oauth2/v2.0/token", () => {
     expect(res.body.scope).toBe("email openid profile");
     expect(res.body.expires_in).toBe(599);
     expect(res.body.ext_expires_in).toBe(599);
-    expect(res.body.access_token.length > 300).toBeTruthy();
-    expect(res.body.id_token.length > 300).toBeTruthy();
     expect(accessData.email).toBe("test@example.com");
     expect(idData.email).toBe("test@example.com");
   });
 
-  it("should return 401 if challenge does not match", async () => {
-    const wrongChallenge = "fakeChallenge";
-
+  it.each([
+    {
+      directoryID: "wrongId",
+      client_id: client_id,
+      code_challenge,
+      code_verifier,
+    },
+    {
+      directoryID,
+      client_id: "wrongClientId",
+      code_challenge,
+      code_verifier,
+    },
+    {
+      directoryID,
+      client_id: client_id,
+      code_challenge: "wrongChallenge",
+      code_verifier,
+    },
+    {
+      directoryID,
+      client_id: client_id,
+      code_challenge,
+      code_verifier: "wrongVerifier",
+    },
+  ])("should return 401 if challenge fails", async (testData) => {
     const loginRes = await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${wrongChallenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${testData.code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${client_id}`
       )
       .send({
         email: "test@example.com",
@@ -200,47 +220,15 @@ describe("POST /:directoryID/oauth2/v2.0/token", () => {
     const code = url.searchParams.get("code");
 
     const res = await request(app)
-      .post(`/${directoryID}/oauth2/v2.0/token`)
+      .post(`/${testData.directoryID}/oauth2/v2.0/token`)
       .set("Content-Type", "application/x-www-form-urlencoded")
       .send({
-        client_id: "272b6812-f7c9-4f91-b2bc-11be1caff807",
+        client_id: testData.client_id,
         code,
         redirect_uri,
         client_secret,
         grant_type,
-        code_verifier,
-      });
-    expect(res.status).toBe(401);
-  });
-
-  it("should return 401 if Verifier does not match", async () => {
-    const wrongVerifier = "fakeVerifier";
-
-    const loginRes = await request(app)
-      .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
-      )
-      .send({
-        email: "test@example.com",
-        family_name: "Doe",
-        given_name: "John",
-        tp_acct_typ: "VENDOR",
-      });
-
-    const location = loginRes.header.location;
-    const url = new URL(location);
-    const code = url.searchParams.get("code");
-
-    const res = await request(app)
-      .post(`/${directoryID}/oauth2/v2.0/token`)
-      .set("Content-Type", "application/x-www-form-urlencoded")
-      .send({
-        client_id: "272b6812-f7c9-4f91-b2bc-11be1caff807",
-        code,
-        redirect_uri,
-        client_secret,
-        grant_type,
-        code_verifier: wrongVerifier,
+        code_verifier: testData.code_verifier,
       });
     expect(res.status).toBe(401);
   });

@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express from "express";
 import { engine } from "express-handlebars";
 import bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
@@ -29,7 +29,6 @@ app.get("/:directoryID/oauth2/v2.0/authorize", function (req, res) {
   const directoryID = req.params.directoryID;
   const client_id = req.query.client_id as string;
 
-  const searchParams = new URLSearchParams(req.query as Record<string, string>);
   const queryParams = new URLSearchParams(
     Object.fromEntries(
       Object.entries(req.query).map(([key, value]) => [
@@ -49,16 +48,16 @@ app.get("/:directoryID/oauth2/v2.0/authorize", function (req, res) {
 });
 
 app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
-  const directoryID = req.params.directoryID;
+  const directory_id = req.params.directoryID;
   const email = req.body.email;
   const family_name = req.body.family_name;
   const given_name = req.body.given_name;
   const tp_acct_typ = req.body.tp_acct_typ;
-  let redirect_uri = req.query.redirect_uri;
   const state = req.query.state;
   const code_challenge = req.query.code_challenge as string;
   const code_challenge_method = req.query.code_challenge_method as string;
   const client_id = req.query.client_id as string;
+  let redirect_uri = req.query.redirect_uri;
 
   if (typeof redirect_uri !== "string") {
     next(new HttpError(`redirect_uri is not a string: ${redirect_uri}`, 400));
@@ -83,9 +82,9 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
     tp_acct_typ,
   };
 
-  const dataObj = userCache.get(directoryID, client_id);
+  const dataObj = userCache.get(directory_id, client_id);
   dataObj[email] = idData;
-  userCache.set(directoryID, client_id, dataObj);
+  userCache.set(directory_id, client_id, dataObj);
 
   const code = uuidv4();
   pkceChallenges.set(code, {
@@ -96,6 +95,7 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
     code_challenge,
     code_challenge_method,
     client_id,
+    directory_id,
   });
 
   if (state && state.length) {
@@ -108,17 +108,22 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
 app.post("/:directoryID/oauth2/v2.0/token", (req, res, next) => {
   const directoryID = req.params.directoryID;
   const code = req.body.code;
+  const client_id = req.body.client_id;
   const code_verifier = req.body.code_verifier;
 
   if (!pkceChallenges.has(code)) {
-    return next(new HttpError("Invalid Code", 400));
+    next(new HttpError("Invalid Code", 400));
   }
   const challengeUserData = pkceChallenges.get(code) as PkceChallengesInterface;
 
-  const isValid = PkceChallenges.validate(challengeUserData, code_verifier);
+  const isValid = PkceChallenges.validate(
+    directoryID,
+    client_id,
+    challengeUserData,
+    code_verifier
+  );
   if (!isValid) {
-    const error = new HttpError("challenge and verifier does not match", 401);
-    return next(error);
+    next(new HttpError("challenge and verifier does not match", 401));
   }
 
   const access_token = createAccessToken(challengeUserData);

@@ -1,13 +1,14 @@
 import crypto from "crypto";
 
 export interface PkceChallengesInterface {
+  client_id: string;
+  directory_id: string;
+  code_challenge: string;
+  code_challenge_method: string;
   email: string;
   family_name: string;
   given_name: string;
   tp_acct_typ: string;
-  code_challenge: string;
-  client_id: string;
-  code_challenge_method: string;
 }
 
 class PkceChallenges {
@@ -26,12 +27,19 @@ class PkceChallenges {
   }
 
   public static validate(
+    directory_id: string,
+    client_id: string,
     challengeUserInfo: PkceChallengesInterface,
     verifier: string
   ): Boolean {
-    if (!challengeUserInfo) {
+    if (
+      !challengeUserInfo ||
+      directory_id !== challengeUserInfo.directory_id ||
+      client_id !== challengeUserInfo.client_id
+    ) {
       return false;
     }
+
     const algo = challengeUserInfo.code_challenge_method;
     const challenge = challengeUserInfo.code_challenge;
 
@@ -47,7 +55,7 @@ class PkceChallenges {
 
       return expectedChallenge === challenge;
     } else {
-      throw new Error(`Unsupported PKCE algorithm: ${algo}`);
+      return false;
     }
   }
 }
