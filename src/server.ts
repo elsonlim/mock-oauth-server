@@ -1,6 +1,4 @@
 import app from "./app";
+import serverless from "serverless-http";
 
-const port = 3001;
-app.listen(port, function () {
-  console.log(`express-handlebars example server listening on: ${port}`);
-});
+export const handler = serverless(app);

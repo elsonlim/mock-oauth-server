@@ -95,11 +95,11 @@ app.post("/:directoryID/oauth2/v2.0/login", async (req, res, next) => {
     directory_id,
   });
 
-  if (state?.length) {
+  if (typeof state === "string" && state?.length) {
     redirect_uri += `?state=${state}&code=${code}`;
   }
 
-  res.redirect(redirect_uri as string);
+  res.redirect(redirect_uri);
 });
 
 app.post("/:directoryID/oauth2/v2.0/token", async (req, res, next) => {

@@ -25,7 +25,7 @@ class UserDetails {
     this.tableName = tableName;
     const client = new DynamoDBClient({
       region: region,
-      endpoint: endpoint, // For local testing
+      endpoint: endpoint,
     });
     this.docClient = DynamoDBDocumentClient.from(client);
   }
@@ -64,7 +64,7 @@ class UserDetails {
     client_id: string,
     challengeUserInfo: UserDetailsInterface,
     verifier: string
-  ): Boolean {
+  ): boolean {
     if (
       !challengeUserInfo ||
       directory_id !== challengeUserInfo.directory_id ||

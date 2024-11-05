@@ -77,3 +77,5 @@ temp/
 
 # OS generated files
 Thumbs.db
+
+.serverless/

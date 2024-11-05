@@ -1,0 +1,25 @@
+service: oauth-serverless
+provider:
+  name: aws
+  runtime: nodejs16.x
+  stage: dev
+  region: ap-southeast-1
+  environment:
+    TableName: UserDetails
+    Region: ap-southeast-1
+package:
+  patterns:
+    - views/**/*
+    - src/public/**/*
+functions:
+  api:
+    handler: src/server.handler
+    events:
+      - httpApi: "*"
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3001
