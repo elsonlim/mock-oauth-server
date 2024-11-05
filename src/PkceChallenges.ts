@@ -1,6 +1,12 @@
 import crypto from "crypto";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+} from "@aws-sdk/lib-dynamodb";
 
-export interface PkceChallengesInterface {
+export interface UserDetailsInterface {
   client_id: string;
   directory_id: string;
   code_challenge: string;
@@ -11,25 +17,52 @@ export interface PkceChallengesInterface {
   tp_acct_typ: string;
 }
 
-class PkceChallenges {
-  private readonly pkceChallenges = new Map<string, PkceChallengesInterface>();
+class UserDetails {
+  private readonly tableName: string;
+  private readonly docClient: DynamoDBDocumentClient;
 
-  public set(code: string, value: PkceChallengesInterface): void {
-    this.pkceChallenges.set(code, value);
+  constructor(tableName = "", region?: string, endpoint?: string) {
+    this.tableName = tableName;
+    const client = new DynamoDBClient({
+      region: region,
+      endpoint: endpoint, // For local testing
+    });
+    this.docClient = DynamoDBDocumentClient.from(client);
   }
 
-  public get(code: string): PkceChallengesInterface | void {
-    return this.pkceChallenges.get(code);
+  public async set(code: string, value: UserDetailsInterface): Promise<void> {
+    await this.docClient.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: {
+          code: code,
+          ...value,
+        },
+      })
+    );
   }
 
-  public has(code: string): Boolean {
-    return !!this.pkceChallenges.get(code);
+  public async get(code: string): Promise<UserDetailsInterface | undefined> {
+    const result = await this.docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: {
+          code: code,
+        },
+      })
+    );
+    return result.Item as UserDetailsInterface | undefined;
   }
 
-  public static validate(
+  public async has(code: string): Promise<boolean> {
+    const result = await this.get(code);
+    return !!result;
+  }
+
+  public static pkceValidate(
     directory_id: string,
     client_id: string,
-    challengeUserInfo: PkceChallengesInterface,
+    challengeUserInfo: UserDetailsInterface,
     verifier: string
   ): Boolean {
     if (
@@ -60,4 +93,4 @@ class PkceChallenges {
   }
 }
 
-export default PkceChallenges;
+export default UserDetails;

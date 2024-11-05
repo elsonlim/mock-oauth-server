@@ -74,7 +74,7 @@ describe("POST /:directoryID/oauth2/v2.0/login", () => {
     { email: "test2@example.com", given_name: "Jane", tp_acct_typ: "VENDOR" },
     { email: "test2@example.com", family_name: "Smith", tp_acct_typ: "VENDOR" },
     { email: "test2@example.com", family_name: "Smith", given_name: "Jane" },
-  ])("should return 404 if fields are mising", async (userData) => {
+  ])("should return 400 if fields are mising", async (userData) => {
     const res = await request(app)
       .post(
         `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_challenge=${code_challenge}&client_id=${clientId}`

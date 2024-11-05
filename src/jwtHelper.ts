@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
-import { PkceChallengesInterface } from "./PkceChallenges";
+import { UserDetailsInterface } from "./PkceChallenges";
 
-export const createAccessToken = (item: PkceChallengesInterface) => {
+export const createAccessToken = (item: UserDetailsInterface) => {
   const { given_name, family_name, email } = item;
   const name = `${given_name} ${family_name}`;
 
@@ -20,7 +20,7 @@ export const createAccessToken = (item: PkceChallengesInterface) => {
   return access_token;
 };
 
-export const createIdToken = (item: PkceChallengesInterface) => {
+export const createIdToken = (item: UserDetailsInterface) => {
   const { given_name, family_name, email, tp_acct_typ } = item;
   const name = `${given_name} ${family_name}`;
 

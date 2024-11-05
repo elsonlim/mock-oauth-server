@@ -1,14 +1,13 @@
+import * as dotenv from "dotenv";
+dotenv.config();
 import express from "express";
 import { engine } from "express-handlebars";
 import bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
-import dotenv from "dotenv";
-import PkceChallenges, { PkceChallengesInterface } from "./PkceChallenges";
+import UserDetails, { UserDetailsInterface } from "./PkceChallenges";
 import { createAccessToken, createIdToken } from "./jwtHelper";
 import HttpError from "./HttpError";
 import path from "path";
-
-dotenv.config();
 
 const app = express();
 
@@ -16,7 +15,13 @@ app.engine("handlebars", engine());
 app.set("view engine", "handlebars");
 app.use(express.json());
 
-const pkceChallenges = new PkceChallenges();
+const getUserDetailsTable = () => {
+  return new UserDetails(
+    process.env.TableName,
+    process.env.Region,
+    process.env.EndPoint
+  );
+};
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -45,7 +50,7 @@ app.get("/:directoryID/oauth2/v2.0/authorize", function (req, res) {
   });
 });
 
-app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
+app.post("/:directoryID/oauth2/v2.0/login", async (req, res, next) => {
   const directory_id = req.params.directoryID;
   const email = req.body.email;
   const family_name = req.body.family_name;
@@ -58,7 +63,9 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
   let redirect_uri = req.query.redirect_uri;
 
   if (typeof redirect_uri !== "string") {
-    next(new HttpError(`redirect_uri is not a string: ${redirect_uri}`, 400));
+    return next(
+      new HttpError(`redirect_uri is not a string: ${redirect_uri}`, 400)
+    );
   }
 
   if (
@@ -70,18 +77,14 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
     !code_challenge_method ||
     !client_id
   ) {
-    next(new HttpError(`missing parameters: ${req.body} ${req.query}`, 400));
+    return next(
+      new HttpError(`missing parameters: ${req.body} ${req.query}`, 400)
+    );
   }
 
-  const idData = {
-    email,
-    family_name,
-    given_name,
-    tp_acct_typ,
-  };
-
   const code = uuidv4();
-  pkceChallenges.set(code, {
+  const UserDetailsTable = getUserDetailsTable();
+  await UserDetailsTable.set(code, {
     email,
     family_name,
     given_name,
@@ -92,32 +95,36 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
     directory_id,
   });
 
-  if (state && state.length) {
+  if (state?.length) {
     redirect_uri += `?state=${state}&code=${code}`;
   }
 
   res.redirect(redirect_uri as string);
 });
 
-app.post("/:directoryID/oauth2/v2.0/token", (req, res, next) => {
+app.post("/:directoryID/oauth2/v2.0/token", async (req, res, next) => {
   const directoryID = req.params.directoryID;
   const code = req.body.code;
   const client_id = req.body.client_id;
   const code_verifier = req.body.code_verifier;
 
-  if (!pkceChallenges.has(code)) {
-    next(new HttpError("Invalid Code", 400));
+  const UserDetailsTable = getUserDetailsTable();
+  if (!(await UserDetailsTable.has(code))) {
+    return next(new HttpError("Invalid Code", 400));
   }
-  const challengeUserData = pkceChallenges.get(code) as PkceChallengesInterface;
+  const challengeUserData = (await UserDetailsTable.get(
+    code
+  )) as UserDetailsInterface;
 
-  const isValid = PkceChallenges.validate(
+  const isValid = UserDetails.pkceValidate(
     directoryID,
     client_id,
     challengeUserData,
     code_verifier
   );
-  if (!isValid) {
-    next(new HttpError("challenge and verifier does not match", 401));
+  if (!isValid || !challengeUserData) {
+    const error = new HttpError("challenge and verifier does not match", 401);
+    return next(error);
   }
 
   const access_token = createAccessToken(challengeUserData);
@@ -140,7 +147,7 @@ app.use(
     res: express.Response,
     next: express.NextFunction
   ) => {
-    res.status(err.status || 500).send(err.stack);
+    res.status(err.status || 500).json({ message: err.message });
   }
 );
 
