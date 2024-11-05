@@ -15,10 +15,6 @@ export default class UserCache {
   private readonly buildKey = (directoryID: string, clientId: string) =>
     `${directoryID}-${clientId}`;
 
-  private readonly convertToArray = (): UserCacheObj[] => {
-    return Object.values(this.data);
-  };
-
   public set(
     directoryID: string,
     clientId: string,
@@ -29,10 +25,6 @@ export default class UserCache {
 
   public get(directoryID: string, clientId: string): UserCacheArray {
     return this.data.get(this.buildKey(directoryID, clientId)) || {};
-  }
-
-  public has(key: string): boolean {
-    return this.data.has(key);
   }
 
   public getUserDataArray(

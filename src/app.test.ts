@@ -32,14 +32,14 @@ describe("GET /:directoryId/oauth2/v2.0/authorize", () => {
 describe("POST /:directoryID/oauth2/v2.0/login", () => {
   const directoryID = "fake_directory_id";
   const redirectURI = "fake_redirect_uri";
-  const codeVerifier = "fake_verifier";
+  const code_challenge = "code_challenge";
   const state = "fake_state";
   const clientId = "fake_client_id";
 
   it("should redirect to the redirect_uri", async () => {
     const res = await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_verifier=${codeVerifier}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_challenge=${code_challenge}&client_id=${clientId}`
       )
       .send({
         email: "test@example.com",
@@ -55,7 +55,7 @@ describe("POST /:directoryID/oauth2/v2.0/login", () => {
   it("should, show history after a submit", async () => {
     await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_verifier=${codeVerifier}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_challenge=${code_challenge}&client_id=${clientId}`
       )
       .send({
         email: "test@example.com",
@@ -77,7 +77,7 @@ describe("POST /:directoryID/oauth2/v2.0/login", () => {
   it("should redirect to the redirect_uri with state if exist", async () => {
     const res = await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&state=${state}&code_verifier=${codeVerifier}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&state=${state}&code_challenge=${code_challenge}&client_id=${clientId}`
       )
       .send({
         email: "test@example.com",
@@ -98,7 +98,7 @@ describe("POST /:directoryID/oauth2/v2.0/login", () => {
   ])("should return 404 if fields are mising", async (userData) => {
     const res = await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_verifier=${codeVerifier}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_challenge=${code_challenge}&client_id=${clientId}`
       )
       .send(userData);
 
@@ -108,12 +108,11 @@ describe("POST /:directoryID/oauth2/v2.0/login", () => {
 
 describe("POST /:directoryID/oauth2/v2.0/token", () => {
   const directoryID = "fake_directory_id";
-  const code = "fakeCode";
   const client_secret = "client_secret";
   const grant_type = "authorization_code";
-  const code_verifier = "code_verifier";
   const redirect_uri = "http://fake_redirect_uri";
-  const codeVerifier = "codeVerifier";
+  const code_challenge = "code_challenge";
+  const code_verifier = "code_verifier";
   const clientId = "clientId";
   const state = "state";
 
@@ -132,7 +131,7 @@ describe("POST /:directoryID/oauth2/v2.0/token", () => {
   it("should return correct json data", async () => {
     const loginRes = await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_verifier=${codeVerifier}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}&client_id=${clientId}`
       )
       .send({
         email: "test@example.com",

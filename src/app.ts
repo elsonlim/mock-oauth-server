@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from "uuid";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import UserCache from "./UserCache";
+import PkceChallenges, { PkceChallengesInterface } from "./PkceChallenges";
+import { createAccessToken, createIdToken } from "./jwtHelper";
 
 dotenv.config();
 
@@ -14,16 +16,7 @@ app.engine("handlebars", engine());
 app.set("view engine", "handlebars");
 app.use(express.json());
 
-interface UserData {
-  email: string;
-  family_name: string;
-  given_name: string;
-  tp_acct_typ: string;
-  code_verifier: string;
-  client_id: string;
-}
-
-const pkceChallenges = new Map<string, UserData>();
+const pkceChallenges = new PkceChallenges();
 const userCache = new UserCache();
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -63,7 +56,7 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
   const tp_acct_typ = req.body.tp_acct_typ;
   let redirect_uri = req.query.redirect_uri;
   const state = req.query.state;
-  const code_verifier = req.query.code_verifier as string;
+  const code_challenge = req.query.code_challenge as string;
   const client_id = req.query.client_id as string;
 
   if (typeof redirect_uri !== "string") {
@@ -76,7 +69,7 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
     !family_name ||
     !given_name ||
     !tp_acct_typ ||
-    // !code_verifier || to change to code_challenge and method
+    !code_challenge ||
     !client_id
   ) {
     console.error("missing parameters:", req.body, req.query);
@@ -100,7 +93,7 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
     family_name,
     given_name,
     tp_acct_typ,
-    code_verifier,
+    code_challenge,
     client_id,
   });
 
@@ -113,23 +106,13 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
 
 app.post("/:directoryID/oauth2/v2.0/token", (req, res) => {
   const directoryID = req.params.directoryID;
-  const timenow = Math.floor(Date.now() / 1000);
-  const fifteenMinutesInMillis = 15 * 60 * 1000;
-  const exipreTime = timenow + fifteenMinutesInMillis;
-
   const code = req.body.code;
   //   const code_verifier = req.body.code_verifier;
 
-  const {
-    email,
-    family_name,
-    given_name,
-    tp_acct_typ,
-    code_verifier,
-    client_id,
-  } = pkceChallenges.get(code) as UserData;
-
-  const name = `${given_name} ${family_name}`;
+  if (!pkceChallenges.has(code)) {
+    res.status(400).send("Invalid Code");
+  }
+  const challengeUserData = pkceChallenges.get(code) as PkceChallengesInterface;
 
   // extract the challenge,
   // extract the verifier
@@ -137,34 +120,8 @@ app.post("/:directoryID/oauth2/v2.0/token", (req, res) => {
   // match challenge and verifier
   // throw error if doesn't match or proceed if match
 
-  const access_token = jwt.sign(
-    {
-      iat: timenow,
-      nbf: timenow,
-      exp: exipreTime,
-      email,
-      family_name,
-      given_name,
-      name,
-      scp: "email openid profile", // probably sould get from somewhere
-    },
-    process.env.jwtSecret as string
-  );
-
-  const id_token = jwt.sign(
-    {
-      iat: timenow,
-      nbf: timenow,
-      exp: exipreTime,
-      email,
-      family_name,
-      given_name,
-      name,
-      preferred_username: email,
-      tp_acct_typ,
-    },
-    process.env.jwtSecret as string
-  );
+  const access_token = createAccessToken(challengeUserData);
+  const id_token = createIdToken(challengeUserData);
 
   res.json({
     token_type: "Bearer",
