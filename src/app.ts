@@ -1,12 +1,12 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import { engine } from "express-handlebars";
 import bodyParser from "body-parser";
 import { v4 as uuidv4 } from "uuid";
-import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import UserCache from "./UserCache";
 import PkceChallenges, { PkceChallengesInterface } from "./PkceChallenges";
 import { createAccessToken, createIdToken } from "./jwtHelper";
+import HttpError from "./HttpError";
 
 dotenv.config();
 
@@ -48,7 +48,7 @@ app.get("/:directoryID/oauth2/v2.0/authorize", function (req, res) {
   });
 });
 
-app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
+app.post("/:directoryID/oauth2/v2.0/login", (req, res, next) => {
   const directoryID = req.params.directoryID;
   const email = req.body.email;
   const family_name = req.body.family_name;
@@ -57,11 +57,11 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
   let redirect_uri = req.query.redirect_uri;
   const state = req.query.state;
   const code_challenge = req.query.code_challenge as string;
+  const code_challenge_method = req.query.code_challenge_method as string;
   const client_id = req.query.client_id as string;
 
   if (typeof redirect_uri !== "string") {
-    console.error("redirect_uri is not a string:", redirect_uri);
-    res.status(400).send("Invalid redirect_uri");
+    next(new HttpError(`redirect_uri is not a string: ${redirect_uri}`, 400));
   }
 
   if (
@@ -70,10 +70,10 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
     !given_name ||
     !tp_acct_typ ||
     !code_challenge ||
+    !code_challenge_method ||
     !client_id
   ) {
-    console.error("missing parameters:", req.body, req.query);
-    res.status(400).send("Invalid redirect_uri");
+    next(new HttpError(`missing parameters: ${req.body} ${req.query}`, 400));
   }
 
   const idData = {
@@ -94,6 +94,7 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
     given_name,
     tp_acct_typ,
     code_challenge,
+    code_challenge_method,
     client_id,
   });
 
@@ -104,21 +105,21 @@ app.post("/:directoryID/oauth2/v2.0/login", (req, res) => {
   res.redirect(redirect_uri as string);
 });
 
-app.post("/:directoryID/oauth2/v2.0/token", (req, res) => {
+app.post("/:directoryID/oauth2/v2.0/token", (req, res, next) => {
   const directoryID = req.params.directoryID;
   const code = req.body.code;
-  //   const code_verifier = req.body.code_verifier;
+  const code_verifier = req.body.code_verifier;
 
   if (!pkceChallenges.has(code)) {
-    res.status(400).send("Invalid Code");
+    return next(new HttpError("Invalid Code", 400));
   }
   const challengeUserData = pkceChallenges.get(code) as PkceChallengesInterface;
 
-  // extract the challenge,
-  // extract the verifier
-  // extract the algorithm
-  // match challenge and verifier
-  // throw error if doesn't match or proceed if match
+  const isValid = PkceChallenges.validate(challengeUserData, code_verifier);
+  if (!isValid) {
+    const error = new HttpError("challenge and verifier does not match", 401);
+    return next(error);
+  }
 
   const access_token = createAccessToken(challengeUserData);
   const id_token = createIdToken(challengeUserData);
@@ -135,13 +136,12 @@ app.post("/:directoryID/oauth2/v2.0/token", (req, res) => {
 
 app.use(
   (
-    err: Error,
+    err: HttpError,
     req: express.Request,
     res: express.Response,
     next: express.NextFunction
   ) => {
-    console.error(err.stack); // Log the full error stack trace
-    res.status(500).send("Something went wrong!");
+    res.status(err.status || 500).send(err.stack);
   }
 );
 

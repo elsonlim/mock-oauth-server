@@ -32,14 +32,15 @@ describe("GET /:directoryId/oauth2/v2.0/authorize", () => {
 describe("POST /:directoryID/oauth2/v2.0/login", () => {
   const directoryID = "fake_directory_id";
   const redirectURI = "fake_redirect_uri";
-  const code_challenge = "code_challenge";
+  const code_challenge = "fake_challenge";
+  const code_challenge_method = "fake_method";
   const state = "fake_state";
   const clientId = "fake_client_id";
 
   it("should redirect to the redirect_uri", async () => {
     const res = await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_challenge=${code_challenge}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_challenge=${code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
       )
       .send({
         email: "test@example.com",
@@ -55,7 +56,7 @@ describe("POST /:directoryID/oauth2/v2.0/login", () => {
   it("should, show history after a submit", async () => {
     await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_challenge=${code_challenge}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&code_challenge=${code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
       )
       .send({
         email: "test@example.com",
@@ -77,7 +78,7 @@ describe("POST /:directoryID/oauth2/v2.0/login", () => {
   it("should redirect to the redirect_uri with state if exist", async () => {
     const res = await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&state=${state}&code_challenge=${code_challenge}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirectURI}&state=${state}&code_challenge=${code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
       )
       .send({
         email: "test@example.com",
@@ -111,8 +112,9 @@ describe("POST /:directoryID/oauth2/v2.0/token", () => {
   const client_secret = "client_secret";
   const grant_type = "authorization_code";
   const redirect_uri = "http://fake_redirect_uri";
-  const code_challenge = "code_challenge";
-  const code_verifier = "code_verifier";
+  const code_challenge = "XkjGR8UpEbhuwOI3U7uHd_GWLss6XU9rCDFL73pQMyo";
+  const code_verifier = "NCf1tth97RkR64fofrITK_W2F_43NuDEtqdVBl_pt6Y";
+  const code_challenge_method = "s256";
   const clientId = "clientId";
   const state = "state";
 
@@ -131,7 +133,7 @@ describe("POST /:directoryID/oauth2/v2.0/token", () => {
   it("should return correct json data", async () => {
     const loginRes = await request(app)
       .post(
-        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}&client_id=${clientId}`
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
       )
       .send({
         email: "test@example.com",
@@ -177,5 +179,69 @@ describe("POST /:directoryID/oauth2/v2.0/token", () => {
     expect(res.body.id_token.length > 300).toBeTruthy();
     expect(accessData.email).toBe("test@example.com");
     expect(idData.email).toBe("test@example.com");
+  });
+
+  it("should return 401 if challenge does not match", async () => {
+    const wrongChallenge = "fakeChallenge";
+
+    const loginRes = await request(app)
+      .post(
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${wrongChallenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
+      )
+      .send({
+        email: "test@example.com",
+        family_name: "Doe",
+        given_name: "John",
+        tp_acct_typ: "VENDOR",
+      });
+
+    const location = loginRes.header.location;
+    const url = new URL(location);
+    const code = url.searchParams.get("code");
+
+    const res = await request(app)
+      .post(`/${directoryID}/oauth2/v2.0/token`)
+      .set("Content-Type", "application/x-www-form-urlencoded")
+      .send({
+        client_id: "272b6812-f7c9-4f91-b2bc-11be1caff807",
+        code,
+        redirect_uri,
+        client_secret,
+        grant_type,
+        code_verifier,
+      });
+    expect(res.status).toBe(401);
+  });
+
+  it("should return 401 if Verifier does not match", async () => {
+    const wrongVerifier = "fakeVerifier";
+
+    const loginRes = await request(app)
+      .post(
+        `/${directoryID}/oauth2/v2.0/login?redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}&code_challenge_method=${code_challenge_method}&client_id=${clientId}`
+      )
+      .send({
+        email: "test@example.com",
+        family_name: "Doe",
+        given_name: "John",
+        tp_acct_typ: "VENDOR",
+      });
+
+    const location = loginRes.header.location;
+    const url = new URL(location);
+    const code = url.searchParams.get("code");
+
+    const res = await request(app)
+      .post(`/${directoryID}/oauth2/v2.0/token`)
+      .set("Content-Type", "application/x-www-form-urlencoded")
+      .send({
+        client_id: "272b6812-f7c9-4f91-b2bc-11be1caff807",
+        code,
+        redirect_uri,
+        client_secret,
+        grant_type,
+        code_verifier: wrongVerifier,
+      });
+    expect(res.status).toBe(401);
   });
 });
