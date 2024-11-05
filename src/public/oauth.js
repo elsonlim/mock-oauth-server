@@ -19,6 +19,17 @@ function renderQuickSubmit(directoryID, client_id) {
     heading.textContent = "Quick Submit (History)";
     quickSubmitContainer.appendChild(heading);
 
+    const clearHistoryButton = document.createElement("button");
+    clearHistoryButton.textContent = "Clear History";
+    clearHistoryButton.addEventListener("click", () => {
+      localStorage.clear();
+      const quickSubmitContainer = document.getElementById(
+        "quickSubmitContainer"
+      );
+      quickSubmitContainer.innerHTML = "";
+    });
+    quickSubmitContainer.appendChild(clearHistoryButton);
+
     userDataArray.forEach((userData) => {
       const div = document.createElement("div");
       div.style.border = "1px solid #ccc";
